@@ -183,7 +183,7 @@ if (file_exists($basePath . 'includes/finance_handler.php')) {
                     </div>
                     <div class="text-right flex-shrink-0">
                         <p class="font-bold text-red-600"><?= $product['qty'] ?> left</p>
-                        <a href="modules/products/edit.php?id=<?= $product['id'] ?>" class="text-xs text-blue-600 hover:underline">Update Stock</a>
+                        <a href="modules/products/edit.php?id=<?= $product['id'] ?>" class="text-xs text-red-600 hover:underline">Update Stock</a>
                     </div>
                 </li>
                 <?php endforeach; ?>
@@ -200,7 +200,7 @@ if (file_exists($basePath . 'includes/finance_handler.php')) {
                     </div>
                     <h3 class="text-base font-medium text-gray-800">Recent Sales</h3>
                 </div>
-                <a href="modules/sales/list.php" class="text-sm text-blue-600 hover:underline flex items-center">
+                <a href="modules/sales/list.php" class="text-sm text-red-600 hover:underline flex items-center">
                     View All
                     <i class="fas fa-chevron-right text-xs ml-1"></i>
                 </a>
@@ -237,7 +237,7 @@ if (file_exists($basePath . 'includes/finance_handler.php')) {
                         <i class="fas fa-receipt text-gray-400 text-2xl"></i>
                     </div>
                     <p class="text-gray-500">No recent sales found</p>
-                    <a href="modules/sales/add.php" class="mt-3 inline-block text-sm text-blue-600 hover:underline">Create your first sale</a>
+                    <a href="modules/sales/add.php" class="mt-3 inline-block text-sm text-red-600 hover:underline">Create your first sale</a>
                 </div>
             <?php endif; ?>
         </div>
@@ -255,7 +255,7 @@ if (file_exists($basePath . 'includes/finance_handler.php')) {
         <span class="text-xs mt-1">Products</span>
     </a>
     <a href="modules/sales/add.php" class="flex flex-col items-center p-2 text-gray-600">
-        <div class="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center -mt-6 shadow-lg">
+        <div class="bg-red-600 text-white rounded-full w-12 h-12 flex items-center justify-center -mt-6 shadow-lg">
             <i class="fas fa-plus text-xl"></i>
         </div>
         <span class="text-xs mt-1">New Sale</span>

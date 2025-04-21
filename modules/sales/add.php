@@ -3,13 +3,12 @@
 $basePath = '../../';
 include $basePath . 'includes/header.php'; 
 include_once $basePath . 'includes/finance_handler.php';
-include_once $basePath . 'includes/notification_helper.php';
+
 // Get all products for dropdown
 $products = getProducts();
 
 // Get all customers for dropdown
-// Get all customers for dropdown
-$customers = $db->select("SELECT id, name, phone, email FROM customers ORDER BY name ASC");
+$customers = $db->select("SELECT * FROM customers ORDER BY name ASC");
 
 // Pre-select customer if provided in URL
 $selectedCustomerId = isset($_GET['customer']) ? (int)$_GET['customer'] : '';
@@ -113,71 +112,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
 
 
-// Get notification settings to check if emails should be sent
-$emailSettings = $db->select("SELECT * FROM settings WHERE settingGroup = 'notification'");
-$notifySettings = [];
-if (!empty($emailSettings)) {
-    foreach ($emailSettings as $setting) {
-        $notifySettings[$setting['settingKey']] = $setting['settingValue'];
-    }
-}
 
-// Check if customer has an email and invoice emails are enabled
-$customerEmail = "";
-if (!empty($customerId)) {
-    foreach($customers as $c) {
-        if ($c['id'] == $customerId) {
-            $customerEmail = $c['email'] ?? '';
-            break;
-        }
-    }
-}
-
-if (!empty($customerEmail)) {
-    // Send invoice email to customer
-    $emailResult = sendInvoiceEmail($db, $saleId, $customerEmail, $customerName);
-    
-    if ($emailResult !== true) {
-        // Log email sending error but don't stop the process
-        error_log("Failed to send invoice email: " . $emailResult);
-    }
-}
-
-// Send admin notification email if enabled
-$adminEmail = $notifySettings['admin_email'] ?? '';
-$notifyNewOrder = $notifySettings['notify_new_order'] ?? '0';
-
-if (!empty($adminEmail) && $notifyNewOrder === '1') {
-    // Send email to admin
-    $mail = configureMailer($db);
-    if ($mail) {
-        try {
-            $mail->addAddress($adminEmail);
-            $mail->Subject = 'New Sale Notification - ' . $invoiceNumber;
-            $mail->isHTML(true);
-            $mail->Body = '
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <h2 style="color: #bb0620;">New Sale Notification</h2>
-                    <p>A new sale has been created:</p>
-                    <ul>
-                        <li><strong>Invoice Number:</strong> ' . $invoiceNumber . '</li>
-                        <li><strong>Customer:</strong> ' . ($customerName ?: 'Walk-in Customer') . '</li>
-                        <li><strong>Amount:</strong> ' . formatCurrency($totalAmount) . '</li>
-                        <li><strong>Payment Method:</strong> ' . $paymentMethod . '</li>
-                        <li><strong>Payment Status:</strong> ' . $paymentStatus . '</li>
-                        <li><strong>Date:</strong> ' . date('Y-m-d H:i:s') . '</li>
-                    </ul>
-                    <p>Please check the admin panel for more details.</p>
-                </div>
-            ';
-            $mail->send();
-        } catch (Exception $e) {
-            error_log('Admin notification email error: ' . $e->getMessage());
-        }
-    }
-}
-
-
+            
             // Redirect to sales list with success message
             $_SESSION['message'] = "Sale completed successfully!";
             $_SESSION['message_type'] = "success";
@@ -226,9 +162,7 @@ if (!empty($adminEmail) && $notifyNewOrder === '1') {
         <div class="mb-4">
             <div class="flex justify-between items-center mb-2">
                 <label class="text-gray-700 font-medium">Items</label>
-                <button type="button" id="addItemBtn" class="text-slate-950 text-sm">
-                    <i class="fas fa-plus-circle mr-1"></i> Add Item
-                </button>
+                
             </div>
             
             <div id="itemsContainer" class="space-y-3">
@@ -259,7 +193,10 @@ if (!empty($adminEmail) && $notifyNewOrder === '1') {
                 </div>
             </div>
         </div>
-        
+        <button type="button" id="addItemBtn" class="w-full border border-red-600 text-red-600 hover:bg-red-50 font-medium py-2 px-4 rounded-lg text-sm transition duration-200 flex items-center justify-center">
+    <i class="fas fa-plus-circle mr-2"></i> Add Item
+</button>
+
         <!-- Summary -->
         <div class="border-t pt-4 mt-4">
             <div class="flex justify-between items-center text-lg font-bold mb-4">

@@ -271,8 +271,8 @@ if (!isLoggedIn() && !in_array(basename($_SERVER['PHP_SELF']), ['login.php', 'fo
                         </a>
                     </li>
                     <li>
-                        <a href="<?= $basePath ?>modules/settings/company_finances.php" class="block px-4 py-3 hover:bg-gray-100 <?= basename($_SERVER['PHP_SELF']) == 'company_finances.php' ? 'menu-active' : '' ?>">
-                            <i class="fas fa-cog w-6"></i> Financial Settings
+                        <a href="<?= $basePath ?>modules/settings/index.php" class="block px-4 py-3 hover:bg-gray-100 <?= basename($_SERVER['PHP_SELF']) == 'company_finances.php' ? 'menu-active' : '' ?>">
+                            <i class="fas fa-cog w-6"></i> Settings
                         </a>
                     </li>
                     

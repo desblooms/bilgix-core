@@ -247,7 +247,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <i class="fas fa-save mr-2"></i> Save Settings
             </button>
             
-            <button type="submit" name="test_connection" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition">
+            <button type="submit" name="test_connection" class="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition">
                 <i class="fas fa-vial mr-2"></i> Test Connection
             </button>
         </div>

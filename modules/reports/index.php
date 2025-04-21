@@ -18,7 +18,7 @@ $financialSummary = getFinancialSummary();
         <div class="grid grid-cols-2 gap-4 mb-4">
             <div class="bg-blue-50 p-3 rounded-lg">
                 <p class="text-sm text-gray-600">Current Balance</p>
-                <p class="text-xl font-bold text-blue-600"><?= formatCurrency($financialSummary['current_balance']) ?></p>
+                <p class="text-xl font-bold text-red-600"><?= formatCurrency($financialSummary['current_balance']) ?></p>
             </div>
             <div class="bg-green-50 p-3 rounded-lg">
                 <p class="text-sm text-gray-600">Total Profit</p>
@@ -40,7 +40,7 @@ $financialSummary = getFinancialSummary();
                 <div class="grid grid-cols-1 gap-2">
                     <a href="financial_transactions.php" class="flex items-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100">
                         <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
-                            <i class="fas fa-money-bill-wave text-blue-600"></i>
+                            <i class="fas fa-money-bill-wave text-red-600"></i>
                         </div>
                         <div>
                             <p class="font-medium">Financial Transactions</p>
@@ -132,7 +132,7 @@ $financialSummary = getFinancialSummary();
         <span class="text-xs mt-1">Products</span>
     </a>
     <a href="../sales/add.php" class="flex flex-col items-center p-2 text-gray-600">
-        <div class="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center -mt-6 shadow-lg">
+        <div class="bg-red-600 text-white rounded-full w-12 h-12 flex items-center justify-center -mt-6 shadow-lg">
             <i class="fas fa-plus text-xl"></i>
         </div>
         <span class="text-xs mt-1">New Sale</span>

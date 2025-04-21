@@ -133,7 +133,7 @@ $summary = $summary[0];
             </div>
             
             <div class="flex justify-end">
-                <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded-lg">
+                <button type="submit" class="bg-red-600 text-white py-2 px-4 rounded-lg">
                     <i class="fas fa-filter mr-2"></i> Apply Filters
                 </button>
             </div>
@@ -144,7 +144,7 @@ $summary = $summary[0];
     <div class="grid grid-cols-3 gap-4 mb-4">
         <div class="bg-blue-50 p-4 rounded-lg shadow">
             <h3 class="text-sm text-gray-600 mb-1">Total Income</h3>
-            <p class="text-xl font-bold text-blue-600"><?= formatCurrency($summary['total_income'] ?? 0) ?></p>
+            <p class="text-xl font-bold text-red-600"><?= formatCurrency($summary['total_income'] ?? 0) ?></p>
         </div>
         <div class="bg-red-50 p-4 rounded-lg shadow">
             <h3 class="text-sm text-gray-600 mb-1">Total Expenses</h3>
@@ -266,7 +266,7 @@ $summary = $summary[0];
         <span class="text-xs mt-1">Products</span>
     </a>
     <a href="../sales/add.php" class="flex flex-col items-center p-2 text-gray-600">
-        <div class="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center -mt-6 shadow-lg">
+        <div class="bg-red-600 text-white rounded-full w-12 h-12 flex items-center justify-center -mt-6 shadow-lg">
             <i class="fas fa-plus text-xl"></i>
         </div>
         <span class="text-xs mt-1">New Sale</span>

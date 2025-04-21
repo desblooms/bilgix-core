@@ -1,13 +1,13 @@
 <?php 
-// modules/settings/settings_notification.php
+// modules/settings/email_settings.php
 $basePath = '../../';
 include $basePath . 'includes/header.php'; 
 
 // Check user authorization (admin only)
 checkAuthorization('admin');
 
-// Get current email settings from database
-$emailSettings = $db->select("SELECT * FROM settings WHERE settingGroup = 'notification'");
+// Get existing settings
+$emailSettings = $db->select("SELECT * FROM settings WHERE settingGroup = 'email'");
 $settings = [];
 
 // Convert to associative array for easier access
@@ -17,204 +17,202 @@ if (!empty($emailSettings)) {
     }
 }
 
-// Default values if settings don't exist
+// Default values
 $defaults = [
     'smtp_enabled' => '0',
-    'smtp_host' => '',
+    'smtp_host' => 'smtp.example.com',
     'smtp_port' => '587',
     'smtp_username' => '',
-    'smtp_password' => '',
     'smtp_encryption' => 'tls',
-    'email_from' => COMPANY_EMAIL,
-    'email_from_name' => COMPANY_NAME,
-    'notify_low_stock' => '0',
-    'notify_new_order' => '1',
-    'notify_payment_received' => '1',
+    'from_email' => 'noreply@example.com',
+    'from_name' => COMPANY_NAME,
     'admin_email' => '',
-    'email_footer' => 'Thank you for using ' . APP_NAME,
+    'email_footer' => 'Sent from ' . APP_NAME . ' - ' . COMPANY_NAME,
+    'notify_low_stock' => '0',
+    'notify_new_sale' => '0',
+    'notify_payment' => '0'
 ];
 
-// Merge defaults with existing settings
+// Apply defaults for any missing settings
 foreach ($defaults as $key => $value) {
-    if (!isset($settings[$key])) {
-        $settings[$key] = $value;
+    if (!isset($settings['email_' . $key])) {
+        $settings['email_' . $key] = $value;
     }
 }
 
 // Handle form submission
+$message = '';
+$error = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $error = '';
-    $success = '';
-    
     // Get form data
     $smtpEnabled = isset($_POST['smtp_enabled']) ? '1' : '0';
     $smtpHost = sanitize($_POST['smtp_host']);
     $smtpPort = sanitize($_POST['smtp_port']);
     $smtpUsername = sanitize($_POST['smtp_username']);
-    $smtpPassword = $_POST['smtp_password']; // Only save if not empty
+    $smtpPassword = $_POST['smtp_password']; // Don't sanitize password
     $smtpEncryption = sanitize($_POST['smtp_encryption']);
-    $emailFrom = sanitize($_POST['email_from']);
-    $emailFromName = sanitize($_POST['email_from_name']);
-    $notifyLowStock = isset($_POST['notify_low_stock']) ? '1' : '0';
-    $notifyNewOrder = isset($_POST['notify_new_order']) ? '1' : '0';
-    $notifyPaymentReceived = isset($_POST['notify_payment_received']) ? '1' : '0';
+    $fromEmail = sanitize($_POST['from_email']);
+    $fromName = sanitize($_POST['from_name']);
     $adminEmail = sanitize($_POST['admin_email']);
     $emailFooter = sanitize($_POST['email_footer']);
+    $notifyLowStock = isset($_POST['notify_low_stock']) ? '1' : '0';
+    $notifyNewSale = isset($_POST['notify_new_sale']) ? '1' : '0';
+    $notifyPayment = isset($_POST['notify_payment']) ? '1' : '0';
     
-    // Validate email fields
-    if ($smtpEnabled === '1') {
+    // Validation
+    $errors = [];
+    
+    if (empty($fromEmail)) {
+        $errors[] = "From Email is required";
+    } elseif (!isValidEmail($fromEmail)) {
+        $errors[] = "Invalid From Email format";
+    }
+    
+    if (empty($fromName)) {
+        $errors[] = "From Name is required";
+    }
+    
+    if (!empty($adminEmail) && !isValidEmail($adminEmail)) {
+        $errors[] = "Invalid Admin Email format";
+    }
+    
+    if ($smtpEnabled == '1') {
         if (empty($smtpHost)) {
-            $error = "SMTP Host is required when SMTP is enabled";
-        } else if (empty($smtpPort)) {
-            $error = "SMTP Port is required when SMTP is enabled";
-        } else if (empty($smtpUsername)) {
-            $error = "SMTP Username is required when SMTP is enabled";
-        } else if (empty($smtpPassword) && empty($settings['smtp_password'])) {
-            $error = "SMTP Password is required when SMTP is enabled";
+            $errors[] = "SMTP Host is required when SMTP is enabled";
+        }
+        
+        if (empty($smtpPort)) {
+            $errors[] = "SMTP Port is required when SMTP is enabled";
+        } elseif (!is_numeric($smtpPort)) {
+            $errors[] = "SMTP Port must be a number";
+        }
+        
+        if (empty($smtpUsername)) {
+            $errors[] = "SMTP Username is required when SMTP is enabled";
         }
     }
     
-    if (empty($emailFrom) || !filter_var($emailFrom, FILTER_VALIDATE_EMAIL)) {
-        $error = "A valid From Email address is required";
-    }
-    
-    if (empty($emailFromName)) {
-        $error = "From Name is required";
-    }
-    
-    if (!empty($adminEmail) && !filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
-        $error = "Admin Email must be a valid email address";
-    }
-    
-    // If no errors, update settings
-    if (empty($error)) {
-        // Settings to update
-        $settingsToUpdate = [
-            'smtp_enabled' => $smtpEnabled,
-            'smtp_host' => $smtpHost,
-            'smtp_port' => $smtpPort,
-            'smtp_username' => $smtpUsername,
-            'smtp_encryption' => $smtpEncryption,
-            'email_from' => $emailFrom,
-            'email_from_name' => $emailFromName,
-            'notify_low_stock' => $notifyLowStock,
-            'notify_new_order' => $notifyNewOrder,
-            'notify_payment_received' => $notifyPaymentReceived,
-            'admin_email' => $adminEmail,
-            'email_footer' => $emailFooter,
+    // If no errors, save settings
+    if (empty($errors)) {
+        // Settings to save
+        $settingsToSave = [
+            'email_smtp_enabled' => $smtpEnabled,
+            'email_smtp_host' => $smtpHost,
+            'email_smtp_port' => $smtpPort,
+            'email_smtp_username' => $smtpUsername,
+            'email_smtp_encryption' => $smtpEncryption,
+            'email_from_email' => $fromEmail,
+            'email_from_name' => $fromName,
+            'email_admin_email' => $adminEmail,
+            'email_email_footer' => $emailFooter,
+            'email_notify_low_stock' => $notifyLowStock,
+            'email_notify_new_sale' => $notifyNewSale,
+            'email_notify_payment' => $notifyPayment
         ];
         
-        // Only update password if a new one is provided
+        // Only update password if provided
         if (!empty($smtpPassword)) {
-            $settingsToUpdate['smtp_password'] = $smtpPassword;
+            $settingsToSave['email_smtp_password'] = $smtpPassword;
         }
         
-        // Update or insert each setting
-        foreach ($settingsToUpdate as $key => $value) {
-            $existingSetting = $db->select("SELECT id FROM settings WHERE settingKey = :key", ['key' => $key]);
-            
-            if (!empty($existingSetting)) {
-                // Update existing setting
-                $db->update(
-                    'settings', 
-                    ['settingValue' => $value, 'updatedAt' => date('Y-m-d H:i:s')], 
-                    'settingKey = :key', 
-                    ['key' => $key]
-                );
-            } else {
-                // Insert new setting
-                $db->insert('settings', [
-                    'settingKey' => $key,
-                    'settingValue' => $value,
-                    'settingGroup' => 'notification',
-                    'updatedAt' => date('Y-m-d H:i:s')
-                ]);
+        // Start transaction
+        $db->getConnection()->beginTransaction();
+        
+        try {
+            // Save each setting
+            foreach ($settingsToSave as $key => $value) {
+                $existingSetting = $db->select("SELECT id FROM settings WHERE settingKey = :key", ['key' => $key]);
+                
+                if (!empty($existingSetting)) {
+                    // Update existing setting
+                    $db->update('settings', 
+                               ['settingValue' => $value, 'updatedAt' => date('Y-m-d H:i:s')], 
+                               'settingKey = :key', 
+                               ['key' => $key]);
+                } else {
+                    // Insert new setting
+                    $db->insert('settings', [
+                        'settingKey' => $key,
+                        'settingValue' => $value,
+                        'settingGroup' => 'email',
+                        'updatedAt' => date('Y-m-d H:i:s')
+                    ]);
+                }
             }
-        }
-        
-        // Test email if requested
-        if (isset($_POST['test_email']) && $_POST['test_email'] === '1') {
-            // Try to send a test email
-            $testResult = sendTestEmail($emailFrom, $emailFromName, $adminEmail ?: $emailFrom, $smtpEnabled, $smtpHost, $smtpPort, $smtpUsername, $smtpPassword ?: $settings['smtp_password'], $smtpEncryption);
             
-            if ($testResult === true) {
-                $success = "Email settings saved successfully and test email was sent!";
+            // Commit transaction
+            $db->getConnection()->commit();
+            
+            // Send test email if requested
+            if (isset($_POST['send_test'])) {
+                $testResult = sendTestEmail($fromEmail, $fromName, $adminEmail ?: $fromEmail);
+                if ($testResult === true) {
+                    $message = "Settings saved successfully! Test email sent.";
+                } else {
+                    $message = "Settings saved successfully! But test email failed: " . $testResult;
+                }
             } else {
-                $success = "Email settings saved successfully!";
-                $error = "Failed to send test email: " . $testResult;
+                $message = "Email settings saved successfully!";
             }
-        } else {
-            $success = "Email settings saved successfully!";
+            
+            // Refresh settings
+            $emailSettings = $db->select("SELECT * FROM settings WHERE settingGroup = 'email'");
+            $settings = [];
+            foreach ($emailSettings as $setting) {
+                $settings[$setting['settingKey']] = $setting['settingValue'];
+            }
+        } catch (Exception $e) {
+            // Rollback on error
+            $db->getConnection()->rollBack();
+            $error = "Failed to save settings: " . $e->getMessage();
         }
-        
-        // Refresh settings
-        $emailSettings = $db->select("SELECT * FROM settings WHERE settingGroup = 'notification'");
-        foreach ($emailSettings as $setting) {
-            $settings[$setting['settingKey']] = $setting['settingValue'];
-        }
+    } else {
+        $error = implode("<br>", $errors);
     }
 }
 
-/**
- * Send a test email using the configured settings
- * 
- * @param string $from From email address
- * @param string $fromName From name
- * @param string $to To email address
- * @param bool $smtpEnabled Whether SMTP is enabled
- * @param string $smtpHost SMTP host
- * @param string $smtpPort SMTP port
- * @param string $smtpUsername SMTP username
- * @param string $smtpPassword SMTP password
- * @param string $smtpEncryption SMTP encryption
- * @return bool|string True on success, error message on failure
- */
-function sendTestEmail($from, $fromName, $to, $smtpEnabled, $smtpHost, $smtpPort, $smtpUsername, $smtpPassword, $smtpEncryption) {
+// Function to send test email
+function sendTestEmail($fromEmail, $fromName, $toEmail) {
+    global $settings;
+    
+    // Use PHPMailer
+    require_once '../../vendor/autoload.php';
+    
+    $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+    
     try {
-        require_once $GLOBALS['basePath'] . 'vendor/autoload.php';
-        
-        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
-        
         // Server settings
-        if ($smtpEnabled) {
+        if ($settings['email_smtp_enabled'] == '1') {
             $mail->isSMTP();
-            $mail->Host = $smtpHost;
-            $mail->Port = $smtpPort;
+            $mail->Host = $settings['email_smtp_host'];
+            $mail->SMTPAuth = true;
+            $mail->Username = $settings['email_smtp_username'];
+            $mail->Password = $settings['email_smtp_password'];
             
-            if (!empty($smtpUsername)) {
-                $mail->SMTPAuth = true;
-                $mail->Username = $smtpUsername;
-                $mail->Password = $smtpPassword;
-            }
-            
-            if ($smtpEncryption === 'tls') {
+            if ($settings['email_smtp_encryption'] == 'tls') {
                 $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
-            } elseif ($smtpEncryption === 'ssl') {
+            } elseif ($settings['email_smtp_encryption'] == 'ssl') {
                 $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
             }
+            
+            $mail->Port = $settings['email_smtp_port'];
         }
         
-        // Sender and recipient
-        $mail->setFrom($from, $fromName);
-        $mail->addAddress($to);
+        // Recipients
+        $mail->setFrom($fromEmail, $fromName);
+        $mail->addAddress($toEmail);
         
         // Content
         $mail->isHTML(true);
         $mail->Subject = 'Test Email from ' . APP_NAME;
-        $mail->Body = '
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h2 style="color: #bb0620;">Test Email</h2>
-                <p>This is a test email from ' . APP_NAME . ' to verify your email configuration.</p>
-                <p>If you received this email, your email settings are configured correctly!</p>
-                <hr style="border: 1px solid #eee; margin: 20px 0;">
-                <p style="color: #666; font-size: 12px;">This email was sent from ' . APP_NAME . ' at ' . date('Y-m-d H:i:s') . '</p>
-            </div>
-        ';
+        $mail->Body = 'This is a test email from ' . APP_NAME . ' to verify your email settings are working correctly.<br><br>' . 
+                     $settings['email_email_footer'];
         
         $mail->send();
         return true;
     } catch (Exception $e) {
-        return $e->getMessage();
+        return $mail->ErrorInfo;
     }
 }
 ?>
@@ -224,8 +222,14 @@ function sendTestEmail($from, $fromName, $to, $smtpEnabled, $smtpHost, $smtpPort
         <a href="<?= $basePath ?>index.php" class="mr-2 text-slate-950">
             <i class="fas fa-arrow-left"></i>
         </a>
-        <h2 class="text-xl font-bold text-gray-800">Email & Notification Settings</h2>
+        <h2 class="text-xl font-bold text-gray-800">Email & SMTP Settings</h2>
     </div>
+    
+    <?php if (!empty($message)): ?>
+    <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4">
+        <p><i class="fas fa-check-circle mr-2"></i> <?= $message ?></p>
+    </div>
+    <?php endif; ?>
     
     <?php if (!empty($error)): ?>
     <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4">
@@ -233,43 +237,37 @@ function sendTestEmail($from, $fromName, $to, $smtpEnabled, $smtpHost, $smtpPort
     </div>
     <?php endif; ?>
     
-    <?php if (!empty($success)): ?>
-    <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4">
-        <p><i class="fas fa-check-circle mr-2"></i> <?= $success ?></p>
-    </div>
-    <?php endif; ?>
-    
-    <form method="POST" class="bg-white rounded-lg shadow p-4 mb-6">
-        <!-- SMTP Settings -->
-        <div class="border-b pb-4 mb-4">
-            <h3 class="text-lg font-medium text-gray-800 mb-4">Email Server Settings</h3>
+    <form method="POST" class="bg-white rounded-lg shadow p-4">
+        <!-- SMTP Server Settings -->
+        <div class="border-b pb-4 mb-6">
+            <h3 class="text-lg font-medium text-gray-800 mb-4">SMTP Server Settings</h3>
             
             <div class="mb-4">
                 <div class="flex items-center">
-                    <input type="checkbox" id="smtp_enabled" name="smtp_enabled" class="h-4 w-4 text-red-900 focus:ring-red-900 border-gray-300 rounded" <?= $settings['smtp_enabled'] === '1' ? 'checked' : '' ?>>
-                    <label for="smtp_enabled" class="ml-2 block text-gray-700 font-medium">Enable SMTP Server</label>
+                    <input type="checkbox" id="smtp_enabled" name="smtp_enabled" class="h-4 w-4 text-red-900 focus:ring-red-900 border-gray-300 rounded" <?= $settings['email_smtp_enabled'] == '1' ? 'checked' : '' ?>>
+                    <label for="smtp_enabled" class="ml-2 block text-gray-700">Enable SMTP Server</label>
                 </div>
                 <p class="text-xs text-gray-500 mt-1">When disabled, the system will use PHP's mail() function</p>
             </div>
             
-            <div id="smtp_settings" class="<?= $settings['smtp_enabled'] === '1' ? '' : 'hidden' ?> space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div id="smtp_settings" class="<?= $settings['email_smtp_enabled'] == '0' ? 'opacity-50' : '' ?>">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                         <label for="smtp_host" class="block text-gray-700 font-medium mb-2">SMTP Host</label>
-                        <input type="text" id="smtp_host" name="smtp_host" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-900" value="<?= $settings['smtp_host'] ?>">
+                        <input type="text" id="smtp_host" name="smtp_host" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-900" value="<?= $settings['email_smtp_host'] ?>">
                     </div>
                     
                     <div>
                         <label for="smtp_port" class="block text-gray-700 font-medium mb-2">SMTP Port</label>
-                        <input type="text" id="smtp_port" name="smtp_port" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-900" value="<?= $settings['smtp_port'] ?>">
+                        <input type="text" id="smtp_port" name="smtp_port" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-900" value="<?= $settings['email_smtp_port'] ?>">
                         <p class="text-xs text-gray-500 mt-1">Common ports: 25, 465, 587</p>
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                         <label for="smtp_username" class="block text-gray-700 font-medium mb-2">SMTP Username</label>
-                        <input type="text" id="smtp_username" name="smtp_username" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-900" value="<?= $settings['smtp_username'] ?>">
+                        <input type="text" id="smtp_username" name="smtp_username" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-900" value="<?= $settings['email_smtp_username'] ?>">
                     </div>
                     
                     <div>
@@ -279,85 +277,90 @@ function sendTestEmail($from, $fromName, $to, $smtpEnabled, $smtpHost, $smtpPort
                     </div>
                 </div>
                 
-                <div>
+                <div class="mb-4">
                     <label for="smtp_encryption" class="block text-gray-700 font-medium mb-2">Encryption</label>
-                    <select id="smtp_encryption" name="smtp_encryption" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-900">
-                        <option value="tls" <?= $settings['smtp_encryption'] === 'tls' ? 'selected' : '' ?>>TLS</option>
-                        <option value="ssl" <?= $settings['smtp_encryption'] === 'ssl' ? 'selected' : '' ?>>SSL</option>
-                        <option value="none" <?= $settings['smtp_encryption'] === 'none' ? 'selected' : '' ?>>None</option>
-                    </select>
+                    <div class="flex space-x-4">
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="smtp_encryption" value="tls" class="text-red-900 focus:ring-red-900" <?= $settings['email_smtp_encryption'] == 'tls' ? 'checked' : '' ?>>
+                            <span class="ml-2">TLS</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="smtp_encryption" value="ssl" class="text-red-900 focus:ring-red-900" <?= $settings['email_smtp_encryption'] == 'ssl' ? 'checked' : '' ?>>
+                            <span class="ml-2">SSL</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="smtp_encryption" value="none" class="text-red-900 focus:ring-red-900" <?= $settings['email_smtp_encryption'] == 'none' ? 'checked' : '' ?>>
+                            <span class="ml-2">None</span>
+                        </label>
+                    </div>
                 </div>
             </div>
         </div>
         
         <!-- Email Settings -->
-        <div class="mb-6">
+        <div class="border-b pb-4 mb-6">
             <h3 class="text-lg font-medium text-gray-800 mb-4">Email Settings</h3>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                    <label for="email_from" class="block text-gray-700 font-medium mb-2">From Email *</label>
-                    <input type="email" id="email_from" name="email_from" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-900" required value="<?= $settings['email_from'] ?>">
+                    <label for="from_email" class="block text-gray-700 font-medium mb-2">From Email *</label>
+                    <input type="email" id="from_email" name="from_email" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-900" required value="<?= $settings['email_from_email'] ?>">
                 </div>
                 
                 <div>
-                    <label for="email_from_name" class="block text-gray-700 font-medium mb-2">From Name *</label>
-                    <input type="text" id="email_from_name" name="email_from_name" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-900" required value="<?= $settings['email_from_name'] ?>">
+                    <label for="from_name" class="block text-gray-700 font-medium mb-2">From Name *</label>
+                    <input type="text" id="from_name" name="from_name" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-900" required value="<?= $settings['email_from_name'] ?>">
                 </div>
             </div>
             
             <div class="mb-4">
                 <label for="admin_email" class="block text-gray-700 font-medium mb-2">Admin Notification Email</label>
-                <input type="email" id="admin_email" name="admin_email" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-900" value="<?= $settings['admin_email'] ?>">
+                <input type="email" id="admin_email" name="admin_email" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-900" value="<?= $settings['email_admin_email'] ?>">
                 <p class="text-xs text-gray-500 mt-1">Email address for admin notifications (leave empty to use From Email)</p>
             </div>
             
             <div class="mb-4">
                 <label for="email_footer" class="block text-gray-700 font-medium mb-2">Email Footer Text</label>
-                <textarea id="email_footer" name="email_footer" rows="2" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-900"><?= $settings['email_footer'] ?></textarea>
+                <textarea id="email_footer" name="email_footer" rows="2" class="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-900"><?= $settings['email_email_footer'] ?></textarea>
             </div>
         </div>
         
         <!-- Notification Settings -->
-        <div class="mb-6">
+        <div class="border-b pb-4 mb-6">
             <h3 class="text-lg font-medium text-gray-800 mb-4">Notification Settings</h3>
             
-            <div class="mb-4">
+            <div class="space-y-3">
                 <div class="flex items-center">
-                    <input type="checkbox" id="notify_low_stock" name="notify_low_stock" class="h-4 w-4 text-red-900 focus:ring-red-900 border-gray-300 rounded" <?= $settings['notify_low_stock'] === '1' ? 'checked' : '' ?>>
+                    <input type="checkbox" id="notify_low_stock" name="notify_low_stock" class="h-4 w-4 text-red-900 focus:ring-red-900 border-gray-300 rounded" <?= $settings['email_notify_low_stock'] == '1' ? 'checked' : '' ?>>
                     <label for="notify_low_stock" class="ml-2 block text-gray-700">Email notification when products are low in stock</label>
                 </div>
-            </div>
-            
-            <div class="mb-4">
+                
                 <div class="flex items-center">
-                    <input type="checkbox" id="notify_new_order" name="notify_new_order" class="h-4 w-4 text-red-900 focus:ring-red-900 border-gray-300 rounded" <?= $settings['notify_new_order'] === '1' ? 'checked' : '' ?>>
-                    <label for="notify_new_order" class="ml-2 block text-gray-700">Email notification for new sales</label>
+                    <input type="checkbox" id="notify_new_sale" name="notify_new_sale" class="h-4 w-4 text-red-900 focus:ring-red-900 border-gray-300 rounded" <?= $settings['email_notify_new_sale'] == '1' ? 'checked' : '' ?>>
+                    <label for="notify_new_sale" class="ml-2 block text-gray-700">Email notification for new sales</label>
                 </div>
-            </div>
-            
-            <div class="mb-4">
+                
                 <div class="flex items-center">
-                    <input type="checkbox" id="notify_payment_received" name="notify_payment_received" class="h-4 w-4 text-red-900 focus:ring-red-900 border-gray-300 rounded" <?= $settings['notify_payment_received'] === '1' ? 'checked' : '' ?>>
-                    <label for="notify_payment_received" class="ml-2 block text-gray-700">Email notification when payments are received</label>
+                    <input type="checkbox" id="notify_payment" name="notify_payment" class="h-4 w-4 text-red-900 focus:ring-red-900 border-gray-300 rounded" <?= $settings['email_notify_payment'] == '1' ? 'checked' : '' ?>>
+                    <label for="notify_payment" class="ml-2 block text-gray-700">Email notification when payments are received</label>
+                </div>
+                
+                <div class="flex items-center">
+                    <input type="checkbox" id="send_test" name="send_test" class="h-4 w-4 text-red-900 focus:ring-red-900 border-gray-300 rounded">
+                    <label for="send_test" class="ml-2 block text-gray-700">Send test email after saving</label>
                 </div>
             </div>
         </div>
         
-        <div class="flex justify-between items-center">
-            <div class="flex items-center">
-                <input type="checkbox" id="test_email" name="test_email" value="1" class="h-4 w-4 text-red-900 focus:ring-red-900 border-gray-300 rounded">
-                <label for="test_email" class="ml-2 block text-gray-700">Send test email after saving</label>
-            </div>
-            
-            <button type="submit" class="bg-red-900 text-white py-2 px-6 rounded-lg hover:bg-red-900 transition">
+        <div class="mt-6">
+            <button type="submit" class="w-full bg-red-900 text-white py-2 px-4 rounded-lg hover:bg-red-900 transition">
                 <i class="fas fa-save mr-2"></i> Save Settings
             </button>
         </div>
     </form>
     
-    <!-- Email Template Information -->
-    <div class="bg-white rounded-lg shadow p-4">
+    <!-- Email Templates -->
+    <div class="bg-white rounded-lg shadow p-4 mt-6">
         <h3 class="text-lg font-medium text-gray-800 mb-4">Available Email Templates</h3>
         
         <div class="overflow-x-auto">
@@ -371,59 +374,30 @@ function sendTestEmail($from, $fromName, $to, $smtpEnabled, $smtpHost, $smtpPort
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">New Sale</div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="text-sm text-gray-500">Email sent to customers after a sale is created</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-500">After sale completion</div>
-                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">New Sale</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">Email sent to customers after a sale is created</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">After sale completion</td>
                     </tr>
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">Invoice</div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="text-sm text-gray-500">Email with invoice attachment</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-500">When manually sent from invoice page</div>
-                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Invoice</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">Email with invoice attachment</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">When manually sent from invoice page</td>
                     </tr>
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">Low Stock Alert</div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="text-sm text-gray-500">Notification when products reach low stock threshold</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-500">When inventory falls below threshold</div>
-                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Low Stock Alert</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">Notification when products reach low stock threshold</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">When inventory falls below threshold</td>
                     </tr>
                     <tr>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">Payment Receipt</div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="text-sm text-gray-500">Receipt for customer payments</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-500">When payment status changes to "Paid"</div>
-                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Payment Receipt</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">Receipt for customer payments</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">When payment status changes to "Paid"</td>
                     </tr>
                 </tbody>
             </table>
         </div>
         
-        <div class="mt-4 p-4 bg-gray-50 rounded-lg">
-            <p class="text-sm text-gray-600">
-                <i class="fas fa-info-circle text-red-900 mr-2"></i>
-                Email templates are stored in the <code>templates/emails/</code> directory. You can customize them by editing the HTML files.
-            </p>
-        </div>
+        <p class="text-sm text-gray-500 mt-4">Email templates are stored in the `templates/emails/` directory. You can customize them by editing the HTML files.</p>
     </div>
 </div>
 
@@ -454,13 +428,15 @@ function sendTestEmail($from, $fromName, $to, $smtpEnabled, $smtpHost, $smtpPort
 </nav>
 
 <script>
-    // Toggle SMTP settings visibility
-    document.getElementById('smtp_enabled').addEventListener('change', function() {
-        const smtpSettings = document.getElementById('smtp_settings');
+    // Toggle SMTP settings when checkbox is clicked
+    const smtpEnabled = document.getElementById('smtp_enabled');
+    const smtpSettings = document.getElementById('smtp_settings');
+    
+    smtpEnabled.addEventListener('change', function() {
         if (this.checked) {
-            smtpSettings.classList.remove('hidden');
+            smtpSettings.classList.remove('opacity-50');
         } else {
-            smtpSettings.classList.add('hidden');
+            smtpSettings.classList.add('opacity-50');
         }
     });
 </script>

@@ -3,11 +3,11 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
+
 // Include configuration and functions
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
+require_once 'includes/email_helper.php';
 
 // Check if user is already logged in
 if (isLoggedIn()) {
@@ -24,6 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Validate input
     if (empty($email)) {
         $error = "Email address is required";
+    } else if (!isValidEmail($email)) {
+        $error = "Invalid email format";
     } else {
         // Include database connection
         require_once 'includes/db.php';
@@ -34,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                            ['email' => $email]);
         
         if (empty($user)) {
-            // For security reasons, we'll show a generic success message
+            // For security reasons, show a generic success message
             $message = "If an account with that email exists, password reset instructions have been sent.";
         } else {
             // Generate reset token
@@ -54,49 +56,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             dirname($_SERVER['PHP_SELF']) . 
                             '/reset-password.php?token=' . $token;
                 
-                // In a real application, you would send an email with the reset link
-                // For this example, we'll just show the link (for development purposes)
-               
-
-
-require 'vendor/autoload.php'; // make sure this path is correct
-
-$mail = new PHPMailer(true);
-
-try {
-    // Server settings
-    $mail->isSMTP();
-    $mail->Host       = 'smtp.hostinger.com';
-    $mail->SMTPAuth   = true;
-    $mail->Username   = 'info@avoak.desblooms.in';
-    $mail->Password   = 'Avoak@123';
-    $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS; // or use 'tls' if using port 587
-    $mail->Port       = 465;
-
-    // Recipients
-    $mail->setFrom('info@avoak.desblooms.in', APP_NAME);
-    $mail->addAddress($email); // user email
-
-    // Content
-    $mail->isHTML(true);
-    $mail->Subject = 'Password Reset - ' . APP_NAME;
-    $mail->Body    = "Hi,<br><br>Click the link below to reset your password:<br><br><a href='$resetLink'>$resetLink</a><br><br>This link will expire in 1 hour.<br><br>Thanks,<br>" . COMPANY_NAME;
-
-    $mail->send();
-    $message = "If an account with that email exists, password reset instructions have been sent.";
-} catch (Exception $e) {
-    $error = "Email could not be sent. Mailer Error: {$mail->ErrorInfo}";
-}
-
-                // In production, you might use something like PHPMailer to send emails:
-                // $mail = new PHPMailer(true);
-                // ... configure mail settings ...
-                // $mail->addAddress($email);
-                // $mail->Subject = 'Password Reset for ' . APP_NAME;
-                // $mail->Body = "To reset your password, click the link below:\n\n$resetLink\n\nThis link will expire in 1 hour.";
-                // $mail->send();
+                // Send password reset email using our EmailHelper
+                $emailSent = sendPasswordResetEmail($email, $user[0]['name'], $resetLink);
                 
-                // $message = "If an account with that email exists, password reset instructions have been sent.";
+                if ($emailSent) {
+                    $message = "Password reset instructions have been sent to your email address.";
+                } else {
+                    // Log the error for administrators
+                    error_log("Failed to send password reset email to $email: " . getEmailError());
+                    $message = "If an account with that email exists, password reset instructions have been sent.";
+                }
             } else {
                 $error = "An error occurred. Please try again later.";
             }
@@ -121,8 +90,6 @@ try {
     <link rel="apple-touch-icon" href="/assets/icons/icon-192x192.png">
     
     <!-- Stylesheets -->
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.tailwindcss.com"></script>
 
 <script>
@@ -167,7 +134,7 @@ try {
         
         <?php if (!empty($message)): ?>
         <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 rounded">
-            <p><?= $message ?></p>
+            <p><i class="fas fa-check-circle mr-2"></i> <?= $message ?></p>
         </div>
         <?php endif; ?>
         

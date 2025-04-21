@@ -82,7 +82,7 @@ $invoiceZipFilename = 'Invoice_' . $sale['invoiceNumber'] . '.zip';
         
         <div class="p-4 space-y-3">
             <a href="print_invoice.php?id=<?= $saleId ?>" target="_blank" 
-               class="bg-blue-600 text-white py-3 px-4 rounded-lg flex items-center justify-center">
+               class="bg-red-600 text-white py-3 px-4 rounded-lg flex items-center justify-center">
                 <i class="fas fa-file-alt mr-2"></i> View HTML Invoice
             </a>
             
@@ -173,7 +173,7 @@ $invoiceZipFilename = 'Invoice_' . $sale['invoiceNumber'] . '.zip';
     </div>
     
     <!-- Return to Sale -->
-    <a href="view.php?id=<?= $saleId ?>" class="block text-center text-blue-600 mt-4">
+    <a href="view.php?id=<?= $saleId ?>" class="block text-center text-red-600 mt-4">
         <i class="fas fa-arrow-left mr-1"></i> Back to Sale Details
     </a>
 </div>
@@ -189,7 +189,7 @@ $invoiceZipFilename = 'Invoice_' . $sale['invoiceNumber'] . '.zip';
         <span class="text-xs mt-1">Products</span>
     </a>
     <a href="../sales/add.php" class="flex flex-col items-center p-2 text-gray-600">
-        <div class="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center -mt-6 shadow-lg">
+        <div class="bg-red-600 text-white rounded-full w-12 h-12 flex items-center justify-center -mt-6 shadow-lg">
             <i class="fas fa-plus text-xl"></i>
         </div>
         <span class="text-xs mt-1">New Sale</span>

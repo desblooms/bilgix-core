@@ -255,7 +255,7 @@ if (isset($_GET['delete']) && !empty($_GET['delete'])) {
     
     <!-- Email Settings Link -->
     <div class="mt-4">
-        <a href="email_settings.php" class="block text-center text-blue-600">
+        <a href="email_settings.php" class="block text-center text-red-600">
             <i class="fas fa-cog mr-1"></i> Configure Email Settings
         </a>
     </div>
