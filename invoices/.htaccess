@@ -1,0 +1,5 @@
+Options -Indexes
+<Files *.pdf>
+    Order Allow,Deny
+    Allow from all
+</Files>
